@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stack Trace Analyzer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f5f5f5; color: #333; padding: 40px 20px; }
+        h1 { font-size: 22px; margin-bottom: 24px; color: #111; }
+        .container { max-width: 800px; margin: 0 auto; }
+        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #555; }
+        input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; font-family: inherit; background: #fff; margin-bottom: 16px; }
+        textarea { font-family: monospace; font-size: 13px; height: 180px; resize: vertical; }
+        .row { display: flex; gap: 16px; }
+        .row > div { flex: 1; }
+        button { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 11px 24px; font-size: 14px; cursor: pointer; width: 100%; }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #93c5fd; cursor: not-allowed; }
+        #result { margin-top: 28px; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 20px; display: none; }
+        #result h2 { font-size: 16px; margin-bottom: 16px; color: #111; }
+        .field { margin-bottom: 14px; }
+        .field .key { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 4px; }
+        .field .val { font-size: 14px; color: #111; font-family: monospace; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+        .HIGH   { background: #fee2e2; color: #dc2626; }
+        .MEDIUM { background: #fef3c7; color: #d97706; }
+        .LOW    { background: #dcfce7; color: #16a34a; }
+        .steps { padding-left: 18px; }
+        .steps li { font-size: 13px; margin-bottom: 6px; }
+        .error { margin-top: 20px; padding: 12px 16px; background: #fee2e2; color: #dc2626; border-radius: 6px; font-size: 13px; display: none; }
+        #loading { display: none; text-align: center; margin-top: 20px; color: #888; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🔍 Stack Trace Analyzer</h1>
+
+    <div class="row">
+        <div>
+            <label>Service Name</label>
+            <input id="serviceName" type="text" placeholder="user-service" />
+        </div>
+        <div>
+            <label>Environment</label>
+            <select id="environment">
+                <option>prod</option>
+                <option>staging</option>
+                <option>dev</option>
+            </select>
+        </div>
+    </div>
+
+    <label>Stack Trace</label>
+    <textarea id="stackTrace" placeholder="Paste your Java stack trace here..."></textarea>
+
+    <button id="btn" onclick="analyze()">Analyze</button>
+
+    <div id="loading">Analyzing with AI...</div>
+    <div id="error" class="error"></div>
+
+    <div id="result">
+        <h2>Analysis Result</h2>
+        <div class="field"><div class="key">Exception Type</div><div class="val" id="exceptionType"></div></div>
+        <div class="field"><div class="key">Root Cause</div><div class="val" id="rootCause"></div></div>
+        <div class="field"><div class="key">Failure Point</div><div class="val" id="failurePoint"></div></div>
+        <div class="field"><div class="key">Severity</div><div id="severity"></div></div>
+        <div class="field"><div class="key">Suggested Fix</div><ol class="steps" id="suggestedFix"></ol></div>
+    </div>
+</div>
+
+<script>
+    async function analyze() {
+        const serviceName = document.getElementById('serviceName').value.trim();
+        const environment = document.getElementById('environment').value;
+        const stackTrace  = document.getElementById('stackTrace').value.trim();
+
+        if (!serviceName || !stackTrace) { showError('Please fill in all fields.'); return; }
+
+        const btn = document.getElementById('btn');
+        btn.disabled = true;
+        document.getElementById('result').style.display = 'none';
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('loading').style.display = 'block';
+
+        try {
+            const res = await fetch('http://localhost:8080/api/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serviceName, environment, stackTrace })
+            });
+            if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.message || `HTTP ${res.status}`); }
+            showResult(await res.json());
+        } catch (e) {
+            showError(e.message);
+        } finally {
+            btn.disabled = false;
+            document.getElementById('loading').style.display = 'none';
+        }
+    }
+
+    function showResult(data) {
+        document.getElementById('exceptionType').textContent = data.exceptionType || '—';
+        document.getElementById('rootCause').textContent     = data.rootCause     || '—';
+        document.getElementById('failurePoint').textContent  = data.failurePoint  || '—';
+        const sev = (data.severity || 'LOW').toUpperCase();
+        document.getElementById('severity').innerHTML = `<span class="badge ${sev}">${sev}</span>`;
+        document.getElementById('suggestedFix').innerHTML = (data.suggestedFix || []).map(s => `<li>${s}</li>`).join('');
+        document.getElementById('result').style.display = 'block';
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('error');
+        el.textContent = 'Error: ' + msg;
+        el.style.display = 'block';
+    }
+</script>
+</body>
+</html>
