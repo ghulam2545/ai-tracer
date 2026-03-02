@@ -57,3 +57,5 @@ entity/       - Incident JPA entity
 repository/   - Spring Data JPA
 exception/    - Error handling
 ```
+
+![pic.png](out/pic.png)
